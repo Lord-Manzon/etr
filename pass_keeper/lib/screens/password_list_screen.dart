@@ -55,17 +55,14 @@ class _PasswordListScreenState extends State<PasswordListScreen> {
     final status = await Permission.notification.request();
 
     if (status.isGranted) {
-      // Permission granted, proceed with scheduling notifications
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Notification permission granted')),
       );
     } else if (status.isDenied) {
-      // Permission denied
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Notification permission denied')),
       );
     } else if (status.isPermanentlyDenied) {
-      // Permission permanently denied, open app settings
       openAppSettings();
     }
   }
@@ -91,14 +88,13 @@ class _PasswordListScreenState extends State<PasswordListScreen> {
       RepeatInterval
           .values[(intervalDays ~/ 7) - 1], // Convert days to interval
       details,
-      androidScheduleMode: AndroidScheduleMode.exact, // Required parameter
+      androidScheduleMode: AndroidScheduleMode.exact,
     );
   }
 
   void _showNotificationSettings() async {
     await _requestNotificationPermission();
 
-    // Only proceed if the user has granted permission
     if (await Permission.notification.isGranted) {
       int selectedDays = 7; // Default reminder interval
       showDialog(
@@ -147,19 +143,84 @@ class _PasswordListScreenState extends State<PasswordListScreen> {
     }
   }
 
+  void _showEditDialog(BuildContext context, PasswordProvider provider,
+      Map<String, dynamic> password) {
+    final usernameController =
+        TextEditingController(text: password['username']);
+    final passwordController =
+        TextEditingController(text: password['password']);
+    String selectedCategory = password['category'];
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: selectedCategory,
+                items: _categoryIcons.keys
+                    .map((category) => DropdownMenuItem(
+                          value: category,
+                          child: Row(
+                            children: [
+                              Icon(_categoryIcons[category]),
+                              const SizedBox(width: 10),
+                              Text(category),
+                            ],
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (value) {
+                  selectedCategory = value!;
+                },
+                decoration: const InputDecoration(labelText: 'Category'),
+              ),
+              TextField(
+                controller: usernameController,
+                decoration: const InputDecoration(labelText: 'Username'),
+              ),
+              TextField(
+                controller: passwordController,
+                decoration: const InputDecoration(labelText: 'Password'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                provider.updatePassword(password['id'], {
+                  'username': usernameController.text,
+                  'password': passwordController.text,
+                  'category': selectedCategory,
+                });
+                Navigator.of(context).pop();
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<PasswordProvider>(context);
     List<Map<String, dynamic>> passwords = provider.passwords;
 
-    // Filter passwords based on the selected category
     if (_selectedCategory != 'All') {
       passwords = passwords
           .where((password) => password['category'] == _selectedCategory)
           .toList();
     }
 
-    // Filter passwords based on the search query
     passwords = passwords
         .where((password) =>
             password['username']
@@ -176,9 +237,7 @@ class _PasswordListScreenState extends State<PasswordListScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications),
-            onPressed: () {
-              _showNotificationSettings();
-            },
+            onPressed: _showNotificationSettings,
           ),
         ],
       ),
@@ -205,7 +264,6 @@ class _PasswordListScreenState extends State<PasswordListScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  // Category buttons: All, Personal, Work, School, Others
                   ...['All', 'Personal', 'Work', 'School', 'Others']
                       .map((category) {
                     return Padding(
@@ -243,7 +301,7 @@ class _PasswordListScreenState extends State<PasswordListScreen> {
           ),
           Expanded(
             child: passwords.isEmpty
-                ? Center(
+                ? const Center(
                     child: Text(
                       'No passwords found.',
                       style: TextStyle(fontSize: 16, color: Colors.grey),
@@ -310,6 +368,9 @@ class _PasswordListScreenState extends State<PasswordListScreen> {
                               );
                             },
                           ),
+                          onTap: () {
+                            _showEditDialog(context, provider, password);
+                          },
                         ),
                       );
                     },
